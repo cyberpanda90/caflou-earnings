@@ -1,0 +1,22 @@
+body {
+	font-family: monospace;
+	background: black;
+	color: #7cff7c;
+	margin: 0;
+	padding: 1rem;
+	text-align: center;
+}
+h1 {
+	font-size: 1.2rem;
+	margin: 0 0 1rem;
+}
+#status {
+	font-size: 0.8rem;
+	opacity: 0.7;
+	margin-bottom: 0.5rem;
+}
+#amount {
+	font-size: 1.5rem;
+	font-weight: bold;
+	text-shadow: 0 0 5px rgba(124, 255, 124, 0.6);
+}
