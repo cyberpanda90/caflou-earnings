@@ -1,3 +1,5 @@
+const API = typeof browser !== 'undefined' ? browser : chrome
+
 function getCurrentMonthRange() {
 	const now = new Date()
 	const start = new Date(now.getFullYear(), now.getMonth(), 1)
@@ -7,7 +9,6 @@ function getCurrentMonthRange() {
 }
 
 const { start, end } = getCurrentMonthRange()
-
 const CACHE_BUSTER = `_=${Date.now()}`
 
 const TARGET_URL =
@@ -25,22 +26,22 @@ function waitForComplete(tabId, timeoutMs = 20000) {
 
 		function onUpdated(updatedTabId, info) {
 			if (updatedTabId === tabId && info.status === 'complete') {
-				chrome.tabs.onUpdated.removeListener(onUpdated)
+				API.tabs.onUpdated.removeListener(onUpdated)
 				resolve()
 			}
 		}
-		chrome.tabs.onUpdated.addListener(onUpdated)
+		API.tabs.onUpdated.addListener(onUpdated)
 
 		const timer = setInterval(async () => {
 			if (Date.now() - t0 > timeoutMs) {
-				chrome.tabs.onUpdated.removeListener(onUpdated)
+				API.tabs.onUpdated.removeListener(onUpdated)
 				clearInterval(timer)
 				reject(new Error('Timeout loading Caflou.'))
 			}
 			try {
-				const t = await chrome.tabs.get(tabId)
+				const t = await API.tabs.get(tabId)
 				if (t.status === 'complete') {
-					chrome.tabs.onUpdated.removeListener(onUpdated)
+					API.tabs.onUpdated.removeListener(onUpdated)
 					clearInterval(timer)
 					resolve()
 				}
@@ -67,22 +68,35 @@ function scrapeInPage() {
 	})
 }
 
+async function execInTab(tabId, func) {
+	if (API.scripting && API.scripting.executeScript) {
+		const [res] = await API.scripting.executeScript({
+			target: { tabId },
+			func,
+		})
+		return res?.result
+	} else if (API.tabs && API.tabs.executeScript) {
+		const code = `(${func})();`
+		const results = await API.tabs.executeScript(tabId, { code })
+		return results && results[0]
+	} else {
+		throw new Error('No suitable executeScript API available.')
+	}
+}
+
 async function run() {
 	let tabId
 	try {
 		STATUS.textContent = 'Opening hidden Caflou tab…'
 
-		const tab = await chrome.tabs.create({ url: TARGET_URL, active: false })
+		const tab = await API.tabs.create({ url: TARGET_URL, active: false })
 		tabId = tab.id
 
 		await waitForComplete(tabId)
 
 		STATUS.textContent = 'Reading summary…'
 
-		const [{ result }] = await chrome.scripting.executeScript({
-			target: { tabId },
-			func: scrapeInPage,
-		})
+		const result = await execInTab(tabId, scrapeInPage)
 
 		if (result?.amount) {
 			STATUS.textContent = 'Current amount:'
@@ -98,7 +112,7 @@ async function run() {
 	} finally {
 		if (tabId) {
 			try {
-				await chrome.tabs.remove(tabId)
+				await API.tabs.remove(tabId)
 			} catch {}
 		}
 	}

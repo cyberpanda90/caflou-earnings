@@ -1,9 +1,9 @@
 {
 	"manifest_version": 3,
 	"name": "Caflou Earnings",
-	"version": "1.1.0",
+	"version": "1.2.0",
 	"description": "Zobrazí částku z Caflou po kliknutí na ikonku.",
-	"permissions": ["scripting", "tabs"],
+	"permissions": ["tabs", "activeTab", "scripting"],
 	"host_permissions": ["https://mimedigital.caflou.cz/*"],
 	"action": {
 		"default_popup": "popup.html",
@@ -18,8 +18,5 @@
 		"16": "icons/icon16.png",
 		"48": "icons/icon48.png",
 		"128": "icons/icon128.png"
-	},
-	"background": {
-		"service_worker": "background.js"
 	}
 }
