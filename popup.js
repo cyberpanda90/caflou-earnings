@@ -1,5 +1,19 @@
+function getCurrentMonthRange() {
+	const now = new Date()
+	const start = new Date(now.getFullYear(), now.getMonth(), 1)
+	const end = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+	const fmt = (d) => d.toISOString().split('T')[0]
+	return { start: fmt(start), end: fmt(end) }
+}
+
+const { start, end } = getCurrentMonthRange()
+
 const TARGET_URL =
-	'https://mimedigital.caflou.cz/mime-digital/time_entries?filter[start_date]=2025-09-01&filter[end_date]=2025-09-30&filter[only_mine]=true&filter_opened=true&page=1&per=100'
+	`https://mimedigital.caflou.cz/mime-digital/time_entries?` +
+	`filter[start_date]=${start}&` +
+	`filter[end_date]=${end}&` +
+	`filter[only_mine]=true&filter_opened=true&page=1&per=100`
+
 const STATUS = document.getElementById('status')
 const AMOUNT = document.getElementById('amount')
 
