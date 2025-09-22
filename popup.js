@@ -8,17 +8,18 @@ function getCurrentMonthRange() {
 
 const { start, end } = getCurrentMonthRange()
 
+const CACHE_BUSTER = `_=${Date.now()}`
+
 const TARGET_URL =
 	`https://mimedigital.caflou.cz/mime-digital/time_entries?` +
 	`filter[start_date]=${start}&` +
 	`filter[end_date]=${end}&` +
-	`filter[only_mine]=true&filter_opened=true&page=1&per=100`
+	`filter[only_mine]=true&filter_opened=true&page=1&per=100&${CACHE_BUSTER}`
 
 const STATUS = document.getElementById('status')
 const AMOUNT = document.getElementById('amount')
 
-// počká, až bude tab ve stavu "complete"
-function waitForComplete(tabId, timeoutMs = 15000) {
+function waitForComplete(tabId, timeoutMs = 20000) {
 	return new Promise((resolve, reject) => {
 		const t0 = Date.now()
 
@@ -28,16 +29,14 @@ function waitForComplete(tabId, timeoutMs = 15000) {
 				resolve()
 			}
 		}
-
 		chrome.tabs.onUpdated.addListener(onUpdated)
 
 		const timer = setInterval(async () => {
 			if (Date.now() - t0 > timeoutMs) {
 				chrome.tabs.onUpdated.removeListener(onUpdated)
 				clearInterval(timer)
-				reject(new Error('Timeout in loading.'))
+				reject(new Error('Timeout loading Caflou.'))
 			}
-			// safety polling (kdyby event utekl)
 			try {
 				const t = await chrome.tabs.get(tabId)
 				if (t.status === 'complete') {
@@ -45,17 +44,14 @@ function waitForComplete(tabId, timeoutMs = 15000) {
 					clearInterval(timer)
 					resolve()
 				}
-			} catch {
-				// tab zmizel
-			}
+			} catch {}
 		}, 300)
 	})
 }
 
-// kód, který poběží přímo v Caflou tabu
 function scrapeInPage() {
 	return new Promise((resolve) => {
-		const tryFind = (left = 20) => {
+		const tryFind = (left = 24) => {
 			const cell = document.querySelector(
 				'.sumaries tbody tr:nth-child(3) td'
 			)
@@ -72,41 +68,14 @@ function scrapeInPage() {
 }
 
 async function run() {
+	let tabId
 	try {
-		STATUS.textContent = 'Looking for open Caflou tab…'
+		STATUS.textContent = 'Opening hidden Caflou tab…'
 
-		// 1) zkus najít existující tab s Caflou
-		const [existing] = await chrome.tabs.query({
-			url: 'https://mimedigital.caflou.cz/*',
-		})
+		const tab = await chrome.tabs.create({ url: TARGET_URL, active: false })
+		tabId = tab.id
 
-		let tabId
-		if (existing) {
-			tabId = existing.id
-			if (!existing.url.startsWith(TARGET_URL)) {
-				STATUS.textContent = 'Navigating to time entries page…'
-				await chrome.tabs.update(tabId, {
-					url: TARGET_URL,
-					active: false,
-				})
-				await waitForComplete(tabId)
-			} else {
-				// ověř stav správnou funkcí
-				const t = await chrome.tabs.get(tabId)
-				if (t.status !== 'complete') {
-					await waitForComplete(tabId)
-				}
-			}
-		} else {
-			// 2) otevři skrytě nový tab
-			STATUS.textContent = 'Opening Caflou tab…'
-			const tab = await chrome.tabs.create({
-				url: TARGET_URL,
-				active: false,
-			})
-			tabId = tab.id
-			await waitForComplete(tabId)
-		}
+		await waitForComplete(tabId)
 
 		STATUS.textContent = 'Reading summary…'
 
@@ -126,6 +95,12 @@ async function run() {
 		STATUS.textContent = 'Error'
 		AMOUNT.textContent = e.message || String(e)
 		console.error(e)
+	} finally {
+		if (tabId) {
+			try {
+				await chrome.tabs.remove(tabId)
+			} catch {}
+		}
 	}
 }
 
